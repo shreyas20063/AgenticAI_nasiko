@@ -71,6 +71,40 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="HRFlow AI Orchestrator", lifespan=lifespan)
 
+# ── Conversation memory (in-memory, per session) ─────────────────
+# Stores last 5 turns per session_key as list of {"user": str, "assistant": str}
+_conversation_history: dict[str, list] = {}
+HISTORY_MAX_TURNS = 5
+
+
+def _get_session_key(session_id: str, role: str, user_id: str) -> str:
+    return f"{session_id or 'anon'}:{role}:{user_id}"
+
+
+def _get_history(session_key: str) -> list:
+    return _conversation_history.get(session_key, [])
+
+
+def _add_to_history(session_key: str, user_msg: str, assistant_msg: str) -> None:
+    history = _conversation_history.setdefault(session_key, [])
+    history.append({"user": user_msg, "assistant": assistant_msg})
+    if len(history) > HISTORY_MAX_TURNS:
+        history.pop(0)
+
+
+def _build_message_with_history(message: str, history: list) -> str:
+    if not history:
+        return message
+    lines = ["[CONVERSATION HISTORY]"]
+    for turn in history:
+        lines.append(f"User: {turn['user']}")
+        lines.append(f"Assistant: {turn['assistant'][:300]}")
+    lines.append("---")
+    lines.append("[CURRENT MESSAGE]")
+    lines.append(message)
+    return "\n".join(lines)
+
+
 # ── A2A Clients ─────────────────────────────────────────────────
 
 recruitment_client = A2AClient(
@@ -189,6 +223,7 @@ async def handle_a2a(request: Request):
         body = await request.json()
         rpc_request = JsonRpcRequest(**body)
         request_id = rpc_request.id
+        a2a_session_id = rpc_request.params.session_id or ""
 
         if rpc_request.method != "message/send":
             return JSONResponse(
@@ -281,8 +316,11 @@ async def handle_a2a(request: Request):
         agent_routed = agent_key
         logger.info(f"[ROUTER] Role={role} | Agent={agent_key} | Reason={reasoning}")
 
-        # ── Step 4: Build contextualized message ─────────────────
-        contextualized = build_contextualized_message(clean_message, role, user_id)
+        # ── Step 4: Build contextualized message + conversation history ──
+        base_message = build_contextualized_message(clean_message, role, user_id)
+        session_key = _get_session_key(a2a_session_id, role, user_id)
+        history = _get_history(session_key)
+        contextualized = _build_message_with_history(base_message, history)
 
         # ── Step 5: Forward to sub-agent with locked identity ────
         user_context = create_user_context_header(role, user_id, INTERNAL_SECRET)
@@ -297,6 +335,10 @@ async def handle_a2a(request: Request):
                 f"I'm sorry, the {client.agent_name} is temporarily unavailable. "
                 "Please try again shortly."
             )
+
+        # Store turn in conversation history
+        if final_text and result["status"] == "completed":
+            _add_to_history(session_key, clean_message, final_text)
 
         audit(
             request_id=request_id, ip=ip, role=role, user_id=user_id,
