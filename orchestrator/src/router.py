@@ -31,25 +31,26 @@ ROLE_DEFAULTS = {
 # Recruitment and Analytics checked before Employee Services (broadest).
 
 KEYWORD_RULES = [
-    # Recruitment keywords
-    (
-        [
-            "resume", "candidate", "applicant", "hiring", "recruit",
-            "interview", "offer letter", "rejection", "job opening",
-            "vacancy", "screen", "shortlist", "application status",
-            "application", "job position",
-        ],
-        RECRUITMENT,
-    ),
-    # Analytics keywords
+    # Analytics keywords — checked BEFORE recruitment so "hiring pipeline"
+    # beats the bare "hiring" keyword in recruitment rules.
     (
         [
             "headcount", "attrition", "turnover", "metrics", "analytics",
             "dashboard", "insights", "company health", "department stats",
             "workforce", "hiring pipeline", "kpi", "overview", "report",
-            "company doing", "company overview",
+            "company doing", "company overview", "dept stats", "stats",
         ],
         ANALYTICS,
+    ),
+    # Recruitment keywords
+    (
+        [
+            "resume", "candidate", "cand-", "applicant", "hiring", "recruit",
+            "interview", "offer letter", "offer", "rejection", "job opening",
+            "vacancy", "screen", "shortlist", "application status",
+            "application", "job position",
+        ],
+        RECRUITMENT,
     ),
     # Employee Services keywords (broadest — check last)
     (

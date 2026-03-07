@@ -597,7 +597,7 @@ TICKETS = {
 }
 
 
-# ── CALENDAR SLOTS (5 business days) ──────────────────────────
+# ── CALENDAR SLOTS (4 weeks of business days) ──────────────────
 
 CALENDAR_SLOTS = {
     "2026-03-09": ["09:00", "10:30", "14:00", "15:30"],
@@ -605,6 +605,21 @@ CALENDAR_SLOTS = {
     "2026-03-11": ["10:00", "11:30", "14:00", "15:30"],
     "2026-03-12": ["09:00", "10:30", "13:00", "15:00", "16:30"],
     "2026-03-13": ["09:30", "11:00", "14:30", "16:00"],
+    "2026-03-16": ["09:00", "10:30", "14:00", "15:30"],
+    "2026-03-17": ["09:00", "11:00", "14:00", "16:00"],
+    "2026-03-18": ["10:00", "11:30", "14:00", "15:30"],
+    "2026-03-19": ["09:00", "10:30", "13:00", "15:00"],
+    "2026-03-20": ["09:30", "11:00", "14:30", "16:00"],
+    "2026-03-23": ["09:00", "10:30", "14:00", "15:30"],
+    "2026-03-24": ["09:00", "11:00", "14:00", "16:00"],
+    "2026-03-25": ["10:00", "11:30", "14:00", "15:30"],
+    "2026-03-26": ["09:00", "10:30", "13:00", "15:00"],
+    "2026-03-27": ["09:30", "11:00", "14:30", "16:00"],
+    "2026-03-30": ["09:00", "10:30", "14:00", "15:30"],
+    "2026-03-31": ["09:00", "11:00", "14:00", "16:00"],
+    "2026-04-01": ["10:00", "11:30", "14:00", "15:30"],
+    "2026-04-02": ["09:00", "10:30", "13:00", "15:00"],
+    "2026-04-03": ["09:30", "11:00", "14:30", "16:00"],
 }
 
 
@@ -744,6 +759,42 @@ PAYSLIPS = {
             "net_salary": 50416,
         },
     },
+    "EMP-004": {
+        "2026-01": {
+            "gross_salary": 70833,
+            "basic": 35417,
+            "hra": 14167,
+            "special_allowance": 21249,
+            "deductions": {"pf": 4250, "tax": 4167, "insurance": 1500},
+            "net_salary": 60916,
+        },
+        "2026-02": {
+            "gross_salary": 70833,
+            "basic": 35417,
+            "hra": 14167,
+            "special_allowance": 21249,
+            "deductions": {"pf": 4250, "tax": 4167, "insurance": 1500},
+            "net_salary": 60916,
+        },
+    },
+    "EMP-005": {
+        "2026-01": {
+            "gross_salary": 65000,
+            "basic": 32500,
+            "hra": 13000,
+            "special_allowance": 19500,
+            "deductions": {"pf": 3900, "tax": 3333, "insurance": 1500},
+            "net_salary": 56267,
+        },
+        "2026-02": {
+            "gross_salary": 65000,
+            "basic": 32500,
+            "hra": 13000,
+            "special_allowance": 19500,
+            "deductions": {"pf": 3900, "tax": 3333, "insurance": 1500},
+            "net_salary": 56267,
+        },
+    },
     "EMP-006": {
         "2026-01": {
             "gross_salary": 75000,
@@ -760,6 +811,114 @@ PAYSLIPS = {
             "special_allowance": 22500,
             "deductions": {"pf": 4500, "tax": 5000, "insurance": 1500},
             "net_salary": 64000,
+        },
+    },
+    "EMP-007": {
+        "2026-01": {
+            "gross_salary": 87500,
+            "basic": 43750,
+            "hra": 17500,
+            "special_allowance": 26250,
+            "deductions": {"pf": 5250, "tax": 6667, "insurance": 1500},
+            "net_salary": 74083,
+        },
+        "2026-02": {
+            "gross_salary": 87500,
+            "basic": 43750,
+            "hra": 17500,
+            "special_allowance": 26250,
+            "deductions": {"pf": 5250, "tax": 6667, "insurance": 1500},
+            "net_salary": 74083,
+        },
+    },
+    "EMP-008": {
+        "2026-01": {
+            "gross_salary": 91667,
+            "basic": 45834,
+            "hra": 18333,
+            "special_allowance": 27500,
+            "deductions": {"pf": 5500, "tax": 7500, "insurance": 1500},
+            "net_salary": 77167,
+        },
+        "2026-02": {
+            "gross_salary": 91667,
+            "basic": 45834,
+            "hra": 18333,
+            "special_allowance": 27500,
+            "deductions": {"pf": 5500, "tax": 7500, "insurance": 1500},
+            "net_salary": 77167,
+        },
+    },
+    "EMP-009": {
+        "2026-01": {
+            "gross_salary": 125000,
+            "basic": 62500,
+            "hra": 25000,
+            "special_allowance": 37500,
+            "deductions": {"pf": 7500, "tax": 12500, "insurance": 1500},
+            "net_salary": 103500,
+        },
+        "2026-02": {
+            "gross_salary": 125000,
+            "basic": 62500,
+            "hra": 25000,
+            "special_allowance": 37500,
+            "deductions": {"pf": 7500, "tax": 12500, "insurance": 1500},
+            "net_salary": 103500,
+        },
+    },
+    "EMP-010": {
+        "2026-01": {
+            "gross_salary": 208333,
+            "basic": 104167,
+            "hra": 41667,
+            "special_allowance": 62499,
+            "deductions": {"pf": 12500, "tax": 35000, "insurance": 1500},
+            "net_salary": 159333,
+        },
+        "2026-02": {
+            "gross_salary": 208333,
+            "basic": 104167,
+            "hra": 41667,
+            "special_allowance": 62499,
+            "deductions": {"pf": 12500, "tax": 35000, "insurance": 1500},
+            "net_salary": 159333,
+        },
+    },
+    "EMP-011": {
+        "2026-01": {
+            "gross_salary": 150000,
+            "basic": 75000,
+            "hra": 30000,
+            "special_allowance": 45000,
+            "deductions": {"pf": 9000, "tax": 20000, "insurance": 1500},
+            "net_salary": 119500,
+        },
+        "2026-02": {
+            "gross_salary": 150000,
+            "basic": 75000,
+            "hra": 30000,
+            "special_allowance": 45000,
+            "deductions": {"pf": 9000, "tax": 20000, "insurance": 1500},
+            "net_salary": 119500,
+        },
+    },
+    "EMP-012": {
+        "2026-01": {
+            "gross_salary": 133333,
+            "basic": 66667,
+            "hra": 26667,
+            "special_allowance": 39999,
+            "deductions": {"pf": 8000, "tax": 22000, "insurance": 1500},
+            "net_salary": 101833,
+        },
+        "2026-02": {
+            "gross_salary": 133333,
+            "basic": 66667,
+            "hra": 26667,
+            "special_allowance": 39999,
+            "deductions": {"pf": 8000, "tax": 22000, "insurance": 1500},
+            "net_salary": 101833,
         },
     },
 }

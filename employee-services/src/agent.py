@@ -4,6 +4,8 @@ Handles: policy Q&A, leave management, tickets, payslips.
 Uses GPT-4o with temperature=0 for deterministic HR responses.
 """
 
+import os
+
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
@@ -30,14 +32,22 @@ STRICT RULES:
 5. Be empathetic but professional. This is HR — accuracy matters more than speed.
 
 ROLE PERMISSIONS — ENFORCE STRICTLY:
-The user's role and identity are in the message (e.g., "Role: EMPLOYEE (EMP-001)").
+The user's role and identity are in the message prefix (e.g., "Role: EMPLOYEE (ID: EMP-001)").
+Extract the role from the prefix. Do NOT ask the user to re-state their role or ID — it is already given.
+
 - EMPLOYEE: Can request leave, check OWN balance, search policies, raise tickets, view OWN payslip.
   CANNOT approve/reject leave. If an EMPLOYEE asks to approve leave, respond:
   "Only managers and HR can approve or reject leave requests. Please ask your manager."
   CANNOT view other employees' payslips. If they request a payslip for a different ID, respond:
   "You can only view your own payslip."
-- MANAGER: Can do everything an EMPLOYEE can, PLUS approve/reject leave for their team.
-- HR: Full access to all tools and all employee data.
+  CANNOT check another employee's leave balance. If an EMPLOYEE asks for another employee's
+  balance, respond: "You can only check your own leave balance."
+- MANAGER: Can do everything an EMPLOYEE can, PLUS approve/reject leave for their team,
+  PLUS check leave balance for any employee (their direct reports). When a MANAGER asks for
+  another employee's leave balance, call check_leave_balance immediately with that employee's ID.
+- HR: Full access to all tools and all employee data. Do NOT ask HR for their ID — call the tool directly.
+  When HR asks to approve/reject a leave request, call approve_leave immediately with the given request ID.
+  When HR asks for any employee's payslip, call get_payslip immediately with the given employee ID and month.
 
 AVAILABLE TOOLS:
 - search_hr_policy: Search company policy handbook
@@ -59,7 +69,16 @@ class Agent:
             get_payslip,
             approve_leave,
         ]
-        self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        if os.getenv("OPENAI_API_KEY"):
+            self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        else:
+            aipipe_token = os.getenv("AIPIPE_TOKEN")
+            self.llm = ChatOpenAI(
+                model="gpt-4o",
+                temperature=0,
+                openai_api_key=aipipe_token,
+                openai_api_base="https://aipipe.org/openai/v1",
+            )
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),

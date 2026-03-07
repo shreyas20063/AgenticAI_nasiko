@@ -9,6 +9,7 @@ Serves on port 8003. Exposes:
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 
 import click
 import uvicorn
@@ -23,7 +24,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="HRFlow Analytics Agent")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Analytics Agent starting on port 8003...")
+    get_agent()
+    yield
+
+
+app = FastAPI(title="HRFlow Analytics Agent", lifespan=lifespan)
 
 # Lazy-loaded agent instance
 _agent = None
@@ -56,12 +65,6 @@ def get_agent_card():
     return _agent_card
 
 
-@app.on_event("startup")
-async def startup():
-    logger.info("Analytics Agent starting on port 8003...")
-    get_agent()
-
-
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
@@ -74,6 +77,7 @@ async def agent_card():
 
 @app.post("/")
 async def handle_a2a(request: Request):
+    body = None
     try:
         body = await request.json()
         rpc_request = JsonRpcRequest(**body)
@@ -99,10 +103,7 @@ async def handle_a2a(request: Request):
 
     except Exception as e:
         logger.error(f"[ERROR] {str(e)}", exc_info=True)
-        try:
-            request_id = body.get("id", "unknown")
-        except Exception:
-            request_id = "unknown"
+        request_id = body.get("id", "unknown") if body else "unknown"
         error_response = create_failed_task(f"Agent error: {str(e)}", request_id)
         return JSONResponse(content=error_response.model_dump(), status_code=500)
 

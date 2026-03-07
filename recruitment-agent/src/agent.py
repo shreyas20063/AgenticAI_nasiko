@@ -5,6 +5,8 @@ offer/rejection decisions, and application status tracking.
 Uses GPT-4o with temperature=0 for deterministic hiring decisions.
 """
 
+import os
+
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
@@ -24,6 +26,8 @@ ranking, interview scheduling, offer/rejection decisions, and application status
 
 STRICT RULES:
 1. When screening resumes, ONLY use the screen_resume tool. NEVER invent scores or assessments.
+   Call screen_resume IMMEDIATELY with whatever resume text is provided — even a short snippet.
+   Do NOT ask for more resume details before calling the tool.
 2. Score candidates based on SKILLS and EXPERIENCE only — never on name, gender, age, or personal attributes.
 3. When scheduling interviews, always confirm the date and time with the available slots.
 4. Be professional and objective. Hiring decisions must be fair and evidence-based.
@@ -40,7 +44,17 @@ The user's role and identity are in the message (e.g., "Role: APPLICANT (CAND-00
   "You can only check your own application status."
 - MANAGER: Can view candidates for their department (rank_candidates, get_application_status).
   Can schedule interviews. CANNOT send offer/rejection decisions.
-- HR: Full access to ALL recruitment tools.
+- HR: Full access to ALL recruitment tools. HR has NO employee ID — the message will be
+  just "Role: HR." with no parenthetical. NEVER ask HR for an ID.
+
+CRITICAL RULES FOR HR ACTIONS:
+- When HR says "send an offer to CAND-XXX", immediately call send_decision with
+  candidate_id=CAND-XXX, decision="offer". Do NOT ask for HR ID or confirmation.
+- When HR says "send a rejection to CAND-XXX", immediately call send_decision with
+  candidate_id=CAND-XXX, decision="rejection". Do NOT ask for HR ID or confirmation.
+- If the decision type is anything OTHER than "offer" or "rejection" (e.g. "counter-offer",
+  "revoke", "waitlist"), do NOT call the tool — respond immediately:
+  "I can only send an 'offer' or 'rejection' decision. [type] is not supported."
 
 AVAILABLE TOOLS:
 - screen_resume: Evaluate a resume against job requirements (HR only)
@@ -60,7 +74,16 @@ class Agent:
             send_decision,
             get_application_status,
         ]
-        self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        if os.getenv("OPENAI_API_KEY"):
+            self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        else:
+            aipipe_token = os.getenv("AIPIPE_TOKEN")
+            self.llm = ChatOpenAI(
+                model="gpt-4o",
+                temperature=0,
+                openai_api_key=aipipe_token,
+                openai_api_base="https://aipipe.org/openai/v1",
+            )
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),

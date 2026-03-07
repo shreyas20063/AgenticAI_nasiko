@@ -4,6 +4,8 @@ Handles: headcount, attrition, hiring pipeline, department stats.
 Uses GPT-4o with temperature=0 for deterministic analytics responses.
 """
 
+import os
+
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
@@ -57,7 +59,16 @@ class Agent:
             get_hiring_pipeline,
             get_department_stats,
         ]
-        self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        if os.getenv("OPENAI_API_KEY"):
+            self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        else:
+            aipipe_token = os.getenv("AIPIPE_TOKEN")
+            self.llm = ChatOpenAI(
+                model="gpt-4o",
+                temperature=0,
+                openai_api_key=aipipe_token,
+                openai_api_base="https://aipipe.org/openai/v1",
+            )
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),

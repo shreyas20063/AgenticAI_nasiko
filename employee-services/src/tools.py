@@ -4,28 +4,11 @@ All tools return str and never raise exceptions.
 Mock data is imported from mock_data.py (copied into src/ at build time).
 """
 
-import re
 from datetime import date
-from typing import Tuple
 
 from langchain_core.tools import tool
 
 from mock_data import EMPLOYEES, LEAVE_REQUESTS, PAYSLIPS, POLICIES, TICKETS
-
-
-# ── Role extraction helper ──────────────────────────────────────
-
-_ROLE_RE = re.compile(
-    r"Role:\s*(\w+)\s*(?:\(([^)]+)\))?", re.IGNORECASE
-)
-
-
-def _parse_role(text: str) -> Tuple[str, str]:
-    """Extract (role, user_id) from message text. Returns ('unknown','unknown') if not found."""
-    m = _ROLE_RE.search(text)
-    if m:
-        return m.group(1).upper(), (m.group(2) or "unknown").strip()
-    return "UNKNOWN", "unknown"
 
 
 @tool
@@ -209,7 +192,7 @@ def raise_ticket(
         employee_id: Employee ID (e.g., 'EMP-001')
         category: Ticket category — one of: payroll, benefits, harassment, workplace_safety, documents, general
         description: Detailed description of the issue
-        priority: Priority level — P1-Critical, P2-High, P3-Medium, or P4-Low
+        priority: Priority level — P1, P2, P3, or P4 (also accepts P1-Critical, P2-High, etc.)
 
     Returns:
         Ticket ID, assigned team, expected SLA, and escalation info if applicable.
@@ -221,6 +204,9 @@ def raise_ticket(
         valid_categories = ["payroll", "benefits", "harassment", "workplace_safety", "documents", "general"]
         if category not in valid_categories:
             return f"Invalid category '{category}'. Must be one of: {', '.join(valid_categories)}"
+
+        # Normalize priority: accept "P1-Critical", "P2-High", etc. or bare "P1", "P2", etc.
+        priority = priority.split("-")[0].strip().upper()
 
         # Auto-escalate harassment and workplace safety
         if category in ("harassment", "workplace_safety"):

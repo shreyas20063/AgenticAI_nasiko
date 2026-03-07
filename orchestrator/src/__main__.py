@@ -12,6 +12,7 @@ Exposes:
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 
 import click
 import uvicorn
@@ -35,7 +36,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("orchestrator")
 
-app = FastAPI(title="HRFlow AI Orchestrator")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("HRFlow AI Orchestrator starting on port 5000...")
+    logger.info(f"  Recruitment Agent:       {recruitment_client.base_url}")
+    logger.info(f"  Employee Services Agent: {employee_services_client.base_url}")
+    logger.info(f"  Analytics Agent:         {analytics_client.base_url}")
+    yield
+
+
+app = FastAPI(title="HRFlow AI Orchestrator", lifespan=lifespan)
 
 # ── A2A Clients (initialized at startup) ───────────────────────
 
@@ -84,20 +95,6 @@ def get_agent_card():
 
 
 # ── Endpoints ───────────────────────────────────────────────────
-
-
-@app.on_event("startup")
-async def startup():
-    logger.info("HRFlow AI Orchestrator starting on port 5000...")
-    logger.info(
-        f"  Recruitment Agent:      {recruitment_client.base_url}"
-    )
-    logger.info(
-        f"  Employee Services Agent: {employee_services_client.base_url}"
-    )
-    logger.info(
-        f"  Analytics Agent:        {analytics_client.base_url}"
-    )
 
 
 @app.get("/health")
