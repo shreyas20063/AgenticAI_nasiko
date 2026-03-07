@@ -5,6 +5,7 @@ set -e
 for dir in orchestrator recruitment-agent employee-services analytics-agent; do
     cp shared/mock_data.py "$dir/src/mock_data.py"
     cp shared/a2a_models.py "$dir/src/a2a_models.py"
+    cp orchestrator/src/session.py "$dir/src/session.py"
     echo "Copied shared files to $dir/src/"
 done
 

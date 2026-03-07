@@ -9,10 +9,13 @@ Security features:
 - Input sanitization (max 2000 chars)
 - Structured audit logging
 - Internal shared-secret header injected to sub-agents
+- Session-based role+identity locking (X-Session-Token)
+- Tamper-proof user context forwarded to sub-agents (X-User-Context)
 
 Exposes:
 - GET  /health                  -> health check
 - GET  /.well-known/agent.json  -> AgentCard
+- POST /session/create          -> create a role-locked session token
 - POST /                        -> A2A JSON-RPC message/send
 """
 
@@ -27,6 +30,7 @@ import click
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from a2a_client import A2AClient
 from a2a_models import JsonRpcRequest, create_completed_task, create_failed_task
@@ -39,6 +43,12 @@ from router import (
     extract_role_from_message,
 )
 from security import audit, check_rate_limit, detect_prompt_injection, sanitize_input
+from session import (
+    VALID_ROLES,
+    create_session_token,
+    create_user_context_header,
+    verify_session_token,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,7 +57,6 @@ logging.basicConfig(
 logger = logging.getLogger("orchestrator")
 
 INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "hrflow-internal-secret-change-me")
-VALID_ROLES = {"employee", "applicant", "hr", "manager", "ceo"}
 
 
 @asynccontextmanager
@@ -116,6 +125,35 @@ async def health():
 @app.get("/.well-known/agent.json")
 async def agent_card():
     return get_agent_card()
+
+
+class SessionCreateRequest(BaseModel):
+    role: str
+    user_id: str = "unknown"
+
+
+@app.post("/session/create")
+async def session_create(body: SessionCreateRequest):
+    """Create a signed session token that locks the caller's role and user_id.
+
+    The token should be included as the X-Session-Token header on all POST /
+    requests. When present, the role and user_id embedded in the token override
+    any role prefix in the message text, preventing impersonation.
+    """
+    role = body.role.strip().lower()
+    if role not in VALID_ROLES:
+        return JSONResponse(
+            content={
+                "error": (
+                    f"Invalid role '{role}'. "
+                    f"Valid roles: {', '.join(sorted(VALID_ROLES))}"
+                )
+            },
+            status_code=400,
+        )
+    token = create_session_token(role, body.user_id.strip(), INTERNAL_SECRET)
+    logger.info(f"[SESSION] Created session: role={role} user_id={body.user_id}")
+    return {"session_token": token, "role": role, "user_id": body.user_id.strip()}
 
 
 @app.post("/")
@@ -203,8 +241,33 @@ async def handle_a2a(request: Request):
 
         logger.info(f"[ORCHESTRATOR] [{ip}] Received: \"{message_text[:150]}\"")
 
-        # ── Step 1: Extract role ─────────────────────────────────
-        role, user_id, clean_message = extract_role_from_message(message_text)
+        # ── Step 1: Session token check (role+identity locking) ──
+        session_token = request.headers.get("X-Session-Token", "")
+        locked_identity = None
+        if session_token:
+            locked_identity = verify_session_token(session_token, INTERNAL_SECRET)
+            if locked_identity is None:
+                logger.warning(f"[SECURITY] Invalid/expired session token from {ip}")
+                response = create_completed_task(
+                    "Your session token is invalid or expired. "
+                    "Please create a new session via POST /session/create.",
+                    request_id,
+                )
+                return JSONResponse(content=response.model_dump(), status_code=401)
+
+        # ── Step 2: Extract role from message or locked session ──
+        msg_role, msg_user_id, clean_message = extract_role_from_message(message_text)
+
+        if locked_identity:
+            role = locked_identity["role"]
+            user_id = locked_identity["user_id"]
+            if msg_role.lower() not in ("none", role):
+                logger.warning(
+                    f"[SECURITY] Session role={role} overrides message role={msg_role} from {ip}"
+                )
+        else:
+            role = msg_role
+            user_id = msg_user_id
 
         if role.lower() not in VALID_ROLES:
             logger.warning(f"[ORCHESTRATOR] Invalid role: '{role}'")
@@ -219,19 +282,20 @@ async def handle_a2a(request: Request):
             )
             return JSONResponse(content=response.model_dump())
 
-        # ── Step 2: LLM intent classification ───────────────────
+        # ── Step 3: LLM intent classification ───────────────────
         agent_key, reasoning = await classify_intent(clean_message, role)
         agent_routed = agent_key
         logger.info(f"[ROUTER] Role={role} | Agent={agent_key} | Reason={reasoning}")
 
-        # ── Step 3: Build contextualized message ─────────────────
+        # ── Step 4: Build contextualized message ─────────────────
         contextualized = build_contextualized_message(clean_message, role, user_id)
 
-        # ── Step 4: Forward to sub-agent ─────────────────────────
+        # ── Step 5: Forward to sub-agent with locked identity ────
+        user_context = create_user_context_header(role, user_id, INTERNAL_SECRET)
         client = AGENT_CLIENTS[agent_key]
-        result = await client.send_message(contextualized)
+        result = await client.send_message(contextualized, user_context=user_context)
 
-        # ── Step 5: Return response ──────────────────────────────
+        # ── Step 6: Return response ──────────────────────────────
         latency = (time.time() - start_time) * 1000
         final_text = result.get("text", "")
         if not final_text and result["status"] != "completed":

@@ -16,7 +16,9 @@ class A2AClient:
         self.timeout = timeout
         self.internal_secret = internal_secret
 
-    async def send_message(self, text: str, session_id: Optional[str] = None) -> dict:
+    async def send_message(
+        self, text: str, session_id: Optional[str] = None, user_context: str = ""
+    ) -> dict:
         request_id = str(uuid.uuid4())
         payload = {
             "jsonrpc": "2.0",
@@ -35,6 +37,8 @@ class A2AClient:
             "Content-Type": "application/json",
             "X-Internal-Token": self.internal_secret,
         }
+        if user_context:
+            headers["X-User-Context"] = user_context
 
         logger.info(f"[A2A] → Sending to {self.agent_name} at {self.base_url}")
 

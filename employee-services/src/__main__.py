@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from a2a_models import JsonRpcRequest, create_completed_task, create_failed_task
+from session import verify_user_context_header
 
 logging.basicConfig(
     level=logging.INFO,
@@ -101,11 +102,23 @@ async def handle_a2a(request: Request):
         ]
         message_text = " ".join(text_parts)
 
+        # Extract locked identity from X-User-Context header
+        user_context_header = request.headers.get("X-User-Context", "")
+        locked_identity = None
+        if user_context_header:
+            locked_identity = verify_user_context_header(user_context_header, INTERNAL_SECRET)
+            if locked_identity:
+                logger.info(
+                    f"[IDENTITY] Locked: role={locked_identity['role']} user_id={locked_identity['user_id']}"
+                )
+            else:
+                logger.warning("[SECURITY] Invalid X-User-Context header — ignoring")
+
         logger.info(f"[REQUEST] id={rpc_request.id} | text={message_text[:200]}")
 
         # Process with agent
         agent = get_agent()
-        response_text = await agent.process_message(message_text)
+        response_text = await agent.process_message(message_text, locked_identity=locked_identity)
 
         logger.info(f"[RESPONSE] id={rpc_request.id} | text={response_text[:200]}")
 
