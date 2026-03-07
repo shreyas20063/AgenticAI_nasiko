@@ -2,11 +2,12 @@ services:
   recruitment-agent:
     build: .
     container_name: recruitment-agent
+    command: ["python", "__main__.py", "--host", "0.0.0.0", "--port", "5000"]
     ports:
-      - "5000:8001"
+      - "5000:5000"
     env_file: ../.env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
