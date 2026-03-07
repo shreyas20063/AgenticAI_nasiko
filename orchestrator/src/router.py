@@ -1,88 +1,45 @@
 """Intent classification and routing for HR queries.
 
 Routes user messages to the correct sub-agent based on role + intent.
-Uses deterministic keyword rules (90%+ coverage) with employee_services fallback.
-NO LLM is used for routing — this is pure Python logic.
+Uses GPT-4o to classify intent — no brittle keyword lists.
 """
 
 import logging
+import os
 import re
 from typing import Tuple
 
-logger = logging.getLogger("orchestrator.router")
+from openai import AsyncOpenAI
 
-# ── Agent target constants ──────────────────────────────────────
+logger = logging.getLogger("orchestrator.router")
 
 RECRUITMENT = "recruitment"
 EMPLOYEE_SERVICES = "employee_services"
 ANALYTICS = "analytics"
 
-# ── Role-based default routing ──────────────────────────────────
-# These roles have unambiguous default agents.
-# Keywords can still override (e.g., CEO asking about hiring).
-
-ROLE_DEFAULTS = {
-    "ceo": ANALYTICS,
-    "applicant": RECRUITMENT,
+# Hard role restrictions — LLM cannot override these
+ROLE_RESTRICTIONS = {
+    "employee": {EMPLOYEE_SERVICES},
+    "applicant": {RECRUITMENT},
 }
 
-# ── Keyword → agent mapping ────────────────────────────────────
-# Checked in order: first match wins.
-# Recruitment and Analytics checked before Employee Services (broadest).
-
-KEYWORD_RULES = [
-    # Analytics keywords — checked BEFORE recruitment so "hiring pipeline"
-    # beats the bare "hiring" keyword in recruitment rules.
-    (
-        [
-            "headcount", "attrition", "turnover", "metrics", "analytics",
-            "dashboard", "insights", "company health", "department stats",
-            "workforce", "hiring pipeline", "kpi", "overview", "report",
-            "company doing", "company overview", "dept stats", "stats",
-        ],
-        ANALYTICS,
-    ),
-    # Recruitment keywords
-    (
-        [
-            "resume", "candidate", "cand-", "applicant", "hiring", "recruit",
-            "interview", "offer letter", "offer", "rejection", "job opening",
-            "vacancy", "screen", "shortlist", "application status",
-            "application", "job position",
-        ],
-        RECRUITMENT,
-    ),
-    # Employee Services keywords (broadest — check last)
-    (
-        [
-            "leave", "policy", "payslip", "salary slip", "ticket",
-            "complaint", "harassment", "grievance", "remote work",
-            "benefits", "insurance", "dress code", "pto", "sick",
-            "vacation", "parental", "onboarding", "expense",
-            "reimbursement", "approve", "reject", "pending",
-        ],
-        EMPLOYEE_SERVICES,
-    ),
-]
-
-# ── Role extraction regex ───────────────────────────────────────
-# Matches: "Role: EMPLOYEE (EMP-001). ..." or "Role: CEO. ..."
 _ROLE_PATTERN = re.compile(
     r"^Role:\s*(\w+)(?:\s*\(([^)]+)\))?\s*\.?\s*(?:Request:\s*)?(.*)",
     re.IGNORECASE | re.DOTALL,
 )
 
+_client = None
+
+
+def _get_openai_client() -> AsyncOpenAI:
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
+
 
 def extract_role_from_message(text: str) -> Tuple[str, str, str]:
-    """Extract role, user ID, and clean message from prefixed text.
-
-    Expected format: "Role: EMPLOYEE (EMP-001). What is the remote work policy?"
-    Also handles: "Role: CEO. How is the company doing?"
-
-    Returns:
-        (role, user_id, clean_message)
-        Defaults to ("none", "unknown", original_text) if no prefix found.
-    """
+    """Extract role, user ID, and clean message from prefixed text."""
     match = _ROLE_PATTERN.match(text.strip())
     if match:
         role = match.group(1).strip()
@@ -90,98 +47,59 @@ def extract_role_from_message(text: str) -> Tuple[str, str, str]:
         clean_message = match.group(3).strip()
         logger.info(f"[ROUTER] Extracted role={role}, user_id={user_id}")
         return role, user_id, clean_message
-
     logger.info("[ROUTER] No role prefix found, returning 'none'")
     return "none", "unknown", text.strip()
 
 
-def classify_intent(user_message: str, role: str) -> Tuple[str, str]:
-    """Classify which sub-agent should handle this request.
-
-    Strategy:
-    1. If role has an unambiguous default (CEO→analytics, applicant→recruitment),
-       check keywords first for override, else use role default.
-    2. For other roles, use keyword matching (first match wins).
-    3. Fallback to employee_services (broadest coverage).
-
-    Returns:
-        (agent_key, reasoning) — e.g., ("analytics", "role_default:ceo")
-    """
-    msg_lower = user_message.lower()
+async def classify_intent(user_message: str, role: str) -> Tuple[str, str]:
+    """Use GPT-4o to classify which sub-agent should handle this request."""
     role_lower = role.lower()
 
-    # Role-based access restrictions (enforced at routing level)
-    # EMPLOYEE: only employee_services
-    # APPLICANT: only recruitment
-    # CEO: only analytics (with keyword override to recruitment)
-    ROLE_RESTRICTIONS = {
-        "employee": {EMPLOYEE_SERVICES},
-        "applicant": {RECRUITMENT},
-    }
+    # Hard restrictions — bypass LLM for single-agent roles
+    allowed = ROLE_RESTRICTIONS.get(role_lower)
+    if allowed and len(allowed) == 1:
+        agent = next(iter(allowed))
+        logger.info(f"[ROUTER] Role={role} restricted to {agent}, skipping LLM")
+        return agent, f"role_restricted:{role_lower}"
 
-    allowed_agents = ROLE_RESTRICTIONS.get(role_lower)
-
-    # Step 1: Role-based defaults with keyword override
-    if role_lower in ROLE_DEFAULTS:
-        default = ROLE_DEFAULTS[role_lower]
-        # Still check keywords — CEO might ask about hiring specifically
-        for keywords, agent in KEYWORD_RULES:
-            matched = [kw for kw in keywords if kw in msg_lower]
-            if matched:
-                # Enforce restrictions: if agent not allowed, use default
-                if allowed_agents and agent not in allowed_agents:
-                    logger.info(
-                        f"[ROUTER] Role={role} | Keyword '{matched[0]}' "
-                        f"matched {agent} but restricted \u2192 {default}"
-                    )
-                    return default, f"role_restricted:{role_lower}"
-                logger.info(
-                    f"[ROUTER] Role={role} | Keyword override: "
-                    f"'{matched[0]}' \u2192 {agent}"
-                )
-                return agent, f"keyword_match:{matched[0]}"
-        logger.info(f"[ROUTER] Role={role} | Using role default \u2192 {default}")
-        return default, f"role_default:{role_lower}"
-
-    # Step 2: Keyword matching for all other roles
-    for keywords, agent in KEYWORD_RULES:
-        matched = [kw for kw in keywords if kw in msg_lower]
-        if matched:
-            # Enforce restrictions
-            if allowed_agents and agent not in allowed_agents:
-                fallback = next(iter(allowed_agents))
-                logger.info(
-                    f"[ROUTER] Role={role} | Keyword '{matched[0]}' "
-                    f"matched {agent} but restricted \u2192 {fallback}"
-                )
-                return fallback, f"role_restricted:{role_lower}"
-            logger.info(
-                f"[ROUTER] Role={role} | Keyword match: "
-                f"'{matched[0]}' \u2192 {agent}"
-            )
-            return agent, f"keyword_match:{matched[0]}"
-
-    # Step 3: Fallback — use restriction default or employee_services
-    if allowed_agents:
-        fallback = next(iter(allowed_agents))
-        logger.info(
-            f"[ROUTER] Role={role} | No keyword match, "
-            f"restricted fallback \u2192 {fallback}"
-        )
-        return fallback, f"role_restricted_fallback:{role_lower}"
-
-    logger.info(
-        f"[ROUTER] Role={role} | No keyword match, "
-        f"falling back to {EMPLOYEE_SERVICES}"
+    system_prompt = (
+        "You are an HR request router. Classify the request into exactly one agent:\n\n"
+        "- recruitment: hiring, job openings, resume screening, candidate status, "
+        "interview scheduling, offer letters\n"
+        "- employee_services: leave requests, payslips, policies, IT tickets, "
+        "benefits, complaints, remote work, expenses\n"
+        "- analytics: headcount, attrition, turnover, department stats, "
+        "workforce metrics, company overview, KPIs\n\n"
+        "Reply with ONLY the agent name: recruitment, employee_services, or analytics"
     )
-    return EMPLOYEE_SERVICES, "fallback:no_keyword_match"
+
+    try:
+        client = _get_openai_client()
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Role: {role}\nRequest: {user_message}"},
+            ],
+            temperature=0,
+            max_tokens=10,
+        )
+        result = response.choices[0].message.content.strip().lower()
+
+        if result not in {RECRUITMENT, EMPLOYEE_SERVICES, ANALYTICS}:
+            logger.warning(f"[ROUTER] LLM returned unexpected '{result}', defaulting to employee_services")
+            return EMPLOYEE_SERVICES, "llm_invalid_fallback"
+
+        logger.info(f"[ROUTER] LLM classified Role={role} -> {result}")
+        return result, f"llm:{result}"
+
+    except Exception as e:
+        logger.error(f"[ROUTER] LLM failed: {e}, falling back to employee_services")
+        return EMPLOYEE_SERVICES, "llm_error_fallback"
 
 
 def build_contextualized_message(
     original_message: str, role: str, user_id: str = "unknown"
 ) -> str:
-    """Inject role context into the message before forwarding to sub-agent.
-
-    The sub-agent sees WHO is asking and adjusts response by permission level.
-    """
+    """Inject role context into the message before forwarding to sub-agent."""
     return f"Role: {role.upper()} (ID: {user_id}). Request: {original_message}"

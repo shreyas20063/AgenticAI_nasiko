@@ -175,8 +175,8 @@ async def handle_a2a(request: Request):
             )
             return JSONResponse(content=response.model_dump())
 
-        # Step 2: Classify intent and pick target agent
-        agent_key, reasoning = classify_intent(clean_message, role)
+        # Step 2: Classify intent and pick target agent (LLM-based)
+        agent_key, reasoning = await classify_intent(clean_message, role)
 
         logger.info(
             f"[ROUTER] Role={role} | Agent={agent_key} | Reason={reasoning}"
