@@ -1,0 +1,43 @@
+{
+  "name": "HRFlow Employee Services Agent",
+  "description": "Handles day-to-day employee HR needs: policy queries, leave management, payslips, support tickets, and leave approvals.",
+  "url": "http://localhost:8002",
+  "protocolVersion": "0.2.9",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "search-hr-policy",
+      "name": "Search HR Policy",
+      "description": "Search company HR policy handbook for answers."
+    },
+    {
+      "id": "request-leave",
+      "name": "Request Leave",
+      "description": "Submit a leave request for an employee."
+    },
+    {
+      "id": "check-leave-balance",
+      "name": "Check Leave Balance",
+      "description": "Check remaining leave days for an employee."
+    },
+    {
+      "id": "raise-ticket",
+      "name": "Raise Ticket",
+      "description": "Create an HR support ticket. Harassment/safety auto-escalate."
+    },
+    {
+      "id": "get-payslip",
+      "name": "Get Payslip",
+      "description": "Retrieve monthly payslip data for an employee."
+    },
+    {
+      "id": "approve-leave",
+      "name": "Approve Leave",
+      "description": "Approve or reject a pending leave request (Manager/HR only)."
+    }
+  ]
+}

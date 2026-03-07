@@ -1,0 +1,63 @@
+services:
+  hr-orchestrator:
+    build: ./orchestrator
+    container_name: hr-orchestrator
+    ports:
+      - "5000:5000"
+    environment:
+      - RECRUITMENT_AGENT_URL=http://recruitment-agent:8001
+      - EMPLOYEE_SERVICES_URL=http://employee-services:8002
+      - ANALYTICS_AGENT_URL=http://analytics-agent:8003
+    env_file: .env
+    depends_on:
+      recruitment-agent:
+        condition: service_healthy
+      employee-services:
+        condition: service_healthy
+      analytics-agent:
+        condition: service_healthy
+    networks:
+      - agents-net
+
+  recruitment-agent:
+    build: ./recruitment-agent
+    container_name: recruitment-agent
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agents-net
+
+  employee-services:
+    build: ./employee-services
+    container_name: employee-services
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agents-net
+
+  analytics-agent:
+    build: ./analytics-agent
+    container_name: analytics-agent
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agents-net
+
+networks:
+  agents-net:
+    external: true

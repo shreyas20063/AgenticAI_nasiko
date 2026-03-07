@@ -1,0 +1,19 @@
+services:
+  recruitment-agent:
+    build: .
+    container_name: recruitment-agent
+    ports:
+      - "5000:8001"
+    env_file: ../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agents-net
+
+networks:
+  agents-net:
+    external: true
