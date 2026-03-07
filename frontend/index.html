@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nasiko HR Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=6">
+</head>
+<body>
+
+    <!-- ==================== LOGIN SCREEN ==================== -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-container">
+            <div class="login-brand">
+                <div class="login-logo">
+                    <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+                        <defs>
+                            <linearGradient id="logo-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#6366F1"/>
+                                <stop offset="100%" stop-color="#8B5CF6"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="48" height="48" rx="14" fill="url(#logo-grad)"/>
+                        <path d="M14 34V14h4l10 14V14h4v20h-4L18 20v14h-4z" fill="white"/>
+                    </svg>
+                </div>
+                <h1>Nasiko HR Platform</h1>
+                <p class="login-subtitle">AI-Powered Enterprise HR Automation</p>
+            </div>
+
+            <form id="login-form" class="login-form" autocomplete="off">
+                <div id="login-error" class="login-error" hidden></div>
+
+                <div class="form-group">
+                    <label for="login-email">Email Address</label>
+                    <input id="login-email" type="email" placeholder="you@company.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input id="login-password" type="password" placeholder="Enter password" required minlength="8">
+                </div>
+
+                <button type="submit" id="login-btn" class="btn btn-primary btn-block">
+                    <span class="btn-text">Sign In</span>
+                    <span class="btn-spinner" hidden></span>
+                </button>
+            </form>
+
+            <div class="demo-credentials">
+                <p class="demo-title">Demo Credentials</p>
+                <div class="demo-row">
+                    <span class="demo-label">Email:</span>
+                    <code>admin@acme.demo</code>
+                </div>
+                <div class="demo-row">
+                    <span class="demo-label">Password:</span>
+                    <code>demo12345</code>
+                </div>
+                <button type="button" id="fill-demo-btn" class="btn btn-outline btn-sm">Use Demo Account</button>
+            </div>
+
+            <div class="login-footer">
+                <p>Nasiko AI &mdash; Hackathon 2026</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP SHELL ==================== -->
+    <div id="app-shell" class="app-shell" hidden>
+
+        <!-- Top Navigation Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+                    </svg>
+                </button>
+                <div class="topbar-brand">
+                    <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
+                        <rect width="48" height="48" rx="12" fill="#4F46E5"/>
+                        <path d="M14 34V14h4l10 14V14h4v20h-4L18 20v14h-4z" fill="white"/>
+                    </svg>
+                    <span class="topbar-title">Nasiko HR Platform</span>
+                </div>
+            </div>
+
+            <div class="topbar-right">
+                <div id="health-indicator" class="health-indicator" title="System health">
+                    <span class="health-dot"></span>
+                    <span class="health-text">Checking...</span>
+                </div>
+
+                <!-- Global Search trigger -->
+                <button id="global-search-btn" class="btn btn-ghost btn-sm" title="Search (Ctrl+K)" aria-label="Global search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+
+                <!-- Dark mode toggle -->
+                <button id="dark-mode-toggle" class="dark-mode-toggle" title="Toggle dark mode (D)" aria-label="Toggle dark mode"></button>
+
+                <!-- Notification bell -->
+                <div style="position:relative">
+                    <button id="notification-bell" class="notification-bell" title="Notifications" aria-label="Notifications">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                        <span class="notif-count" id="notif-count" style="display:none">0</span>
+                    </button>
+                    <div id="notification-dropdown" class="notification-dropdown">
+                        <div class="notif-empty">No new notifications</div>
+                    </div>
+                </div>
+
+                <div class="user-menu">
+                    <span id="user-name" class="user-name"></span>
+                    <span id="user-role-badge" class="role-badge"></span>
+                    <button id="logout-btn" class="btn btn-ghost btn-sm">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <!-- Left Sidebar -->
+            <nav id="sidebar" class="sidebar">
+                <ul class="sidebar-nav">
+                    <li>
+                        <button class="sidebar-link active" data-section="dashboard">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                            </svg>
+                            <span>Dashboard</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-section="chat">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                            </svg>
+                            <span>Chat</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-section="recruitment">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M22 21v-2a4 4 0 00-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 010 7.75"/>
+                            </svg>
+                            <span>Recruitment</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-section="onboarding">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                <polyline points="14,2 14,8 20,8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10,9 9,9 8,9"/>
+                            </svg>
+                            <span>Onboarding</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-section="helpdesk">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            <span>Helpdesk</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button class="sidebar-link" data-section="compliance">
+                            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            <span>Compliance</span>
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="sidebar-footer">
+                    <div class="sidebar-footer-text" style="font-size:0.6875rem;color:var(--color-text-muted)">
+                        v1.0.0 &middot; Press <kbd style="background:var(--color-bg);border:1px solid var(--color-border);border-radius:3px;padding:1px 4px;font-size:0.625rem;font-family:inherit">?</kbd> for shortcuts
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+
+                <!-- Dashboard Section -->
+                <section id="section-dashboard" class="content-section active">
+                    <div class="section-header">
+                        <h2>Dashboard</h2>
+                        <p class="section-subtitle">Overview of your HR operations</p>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon metric-icon-blue">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M22 21v-2a4 4 0 00-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 010 7.75"/>
+                                </svg>
+                            </div>
+                            <div class="metric-info">
+                                <span class="metric-value" id="metric-candidates">--</span>
+                                <span class="metric-label">Total Candidates</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-icon metric-icon-amber">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                            </div>
+                            <div class="metric-info">
+                                <span class="metric-value" id="metric-tickets">--</span>
+                                <span class="metric-label">Open Tickets</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-icon metric-icon-green">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                    <polyline points="22,4 12,14.01 9,11.01"/>
+                                </svg>
+                            </div>
+                            <div class="metric-info">
+                                <span class="metric-value" id="metric-resolved">--</span>
+                                <span class="metric-label">Auto-Resolved</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-icon metric-icon-indigo">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                            </div>
+                            <div class="metric-info">
+                                <span class="metric-value" id="metric-compliance">--</span>
+                                <span class="metric-label">Compliance Score</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-actions">
+                        <h3>Quick Actions</h3>
+                        <div class="actions-grid">
+                            <button class="action-card" data-action="chat-recruit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <line x1="19" y1="8" x2="19" y2="14"/>
+                                    <line x1="22" y1="11" x2="16" y2="11"/>
+                                </svg>
+                                <span>Screen Candidates</span>
+                            </button>
+                            <button class="action-card" data-action="chat-onboard">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                    <polyline points="14,2 14,8 20,8"/>
+                                    <line x1="12" y1="18" x2="12" y2="12"/>
+                                    <line x1="9" y1="15" x2="15" y2="15"/>
+                                </svg>
+                                <span>Start Onboarding</span>
+                            </button>
+                            <button class="action-card" data-action="chat-helpdesk">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                                <span>Open Ticket</span>
+                            </button>
+                            <button class="action-card" data-action="chat-compliance">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                                <span>Compliance Check</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard widgets: charts + upcoming interviews -->
+                    <div class="dashboard-grid">
+                        <div class="dashboard-widget">
+                            <div class="widget-header">
+                                <h4>Hiring Pipeline</h4>
+                            </div>
+                            <div class="widget-body">
+                                <canvas id="chart-pipeline"></canvas>
+                            </div>
+                        </div>
+                        <div class="dashboard-widget">
+                            <div class="widget-header">
+                                <h4>Upcoming Interviews</h4>
+                                <span class="badge badge-info" id="interview-count-badge" style="display:none"></span>
+                            </div>
+                            <div class="widget-body" id="upcoming-interviews-widget">
+                                <div class="skeleton skeleton-card"></div>
+                            </div>
+                        </div>
+                        <div class="dashboard-widget">
+                            <div class="widget-header">
+                                <h4>Tickets by Category</h4>
+                            </div>
+                            <div class="widget-body">
+                                <canvas id="chart-tickets"></canvas>
+                            </div>
+                        </div>
+                        <div class="dashboard-widget">
+                            <div class="widget-header">
+                                <h4>Recruitment Activity</h4>
+                            </div>
+                            <div class="widget-body">
+                                <canvas id="chart-activity"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Chat Section -->
+                <section id="section-chat" class="content-section">
+                    <div class="chat-container">
+                        <div class="chat-header">
+                            <h2>AI HR Assistant</h2>
+                            <p class="chat-header-sub">Ask anything about recruitment, onboarding, HR policies, or compliance</p>
+                        </div>
+
+                        <div id="chat-messages" class="chat-messages">
+                            <div class="chat-welcome">
+                                <div class="chat-welcome-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="1.5">
+                                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                                    </svg>
+                                </div>
+                                <h3>Welcome to Nasiko HR Assistant</h3>
+                                <p>I can help you with:</p>
+                                <div class="chat-suggestions">
+                                    <button class="suggestion-chip" data-message="Show me the top candidates for open positions">Top candidates</button>
+                                    <button class="suggestion-chip" data-message="What is our PTO policy?">PTO policy</button>
+                                    <button class="suggestion-chip" data-message="Generate an onboarding checklist for a new software engineer">Onboarding checklist</button>
+                                    <button class="suggestion-chip" data-message="Run a compliance check on our hiring process">Compliance check</button>
+                                    <button class="suggestion-chip" data-message="How many open helpdesk tickets do we have?">Open tickets</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-area">
+                            <form id="chat-form" class="chat-input-form">
+                                <input id="chat-input" type="text" placeholder="Ask the HR assistant..." autocomplete="off" maxlength="5000">
+                                <button type="submit" id="chat-send-btn" class="btn btn-primary btn-icon" disabled>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13"/>
+                                        <polygon points="22,2 15,22 11,13 2,9"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Recruitment Section -->
+                <section id="section-recruitment" class="content-section">
+                    <div class="section-header">
+                        <h2>Recruitment</h2>
+                        <div class="section-header-actions">
+                            <button class="btn-action-sm" id="btn-export-recruitment" title="Export candidates to CSV">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <p class="section-subtitle">Manage candidates and hiring pipelines</p>
+                    <div class="metrics-grid" id="recruitment-stats"></div>
+
+                    <!-- View toggle: Table / Pipeline / Calendar -->
+                    <div class="view-toggle" id="recruitment-view-toggle">
+                        <button class="view-toggle-btn active" data-view="table">Jobs</button>
+                        <button class="view-toggle-btn" data-view="pipeline">Pipeline</button>
+                        <button class="view-toggle-btn" data-view="calendar">Calendar</button>
+                    </div>
+
+                    <!-- Table view (default) -->
+                    <div id="recruitment-table-view">
+                        <div id="recruitment-search-bar" class="search-filter-bar"></div>
+                        <div class="data-card">
+                            <div class="data-card-header"><h3>Job Openings</h3></div>
+                            <div id="recruitment-body" class="data-card-body">
+                                <div class="loading-state">Loading recruitment data...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pipeline / Kanban view -->
+                    <div id="recruitment-pipeline-view" style="display:none">
+                        <div id="pipeline-search-bar" class="search-filter-bar"></div>
+                        <div id="kanban-board" class="kanban-board"></div>
+                    </div>
+
+                    <!-- Calendar view -->
+                    <div id="recruitment-calendar-view" style="display:none">
+                        <div id="interview-calendar-container"></div>
+                    </div>
+                </section>
+
+                <!-- Onboarding Section -->
+                <section id="section-onboarding" class="content-section">
+                    <div class="section-header">
+                        <h2>Onboarding</h2>
+                        <div class="section-header-actions">
+                            <button class="btn-action-sm" id="btn-export-onboarding" title="Export onboarding data">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    <p class="section-subtitle">New hire onboarding workflows</p>
+                    <div class="metrics-grid" id="onboarding-stats"></div>
+                    <div id="onboarding-body">
+                        <div class="loading-state">Loading onboarding data...</div>
+                    </div>
+                </section>
+
+                <!-- Helpdesk Section -->
+                <section id="section-helpdesk" class="content-section">
+                    <div class="section-header">
+                        <h2>HR Helpdesk</h2>
+                        <div class="section-header-actions">
+                            <button class="btn-action-sm" id="btn-new-ticket" title="Create new ticket (N)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                New Ticket
+                            </button>
+                            <button class="btn-action-sm" id="btn-export-helpdesk" title="Export tickets to CSV">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <p class="section-subtitle">Employee support and ticket management</p>
+                    <div class="metrics-grid" id="helpdesk-stats"></div>
+                    <div id="helpdesk-search-bar" class="search-filter-bar"></div>
+                    <div class="data-card">
+                        <div class="data-card-header"><h3>Tickets</h3></div>
+                        <div id="helpdesk-body" class="data-card-body">
+                            <div class="loading-state">Loading tickets...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Compliance Section -->
+                <section id="section-compliance" class="content-section">
+                    <div class="section-header">
+                        <h2>Compliance</h2>
+                        <div class="section-header-actions">
+                            <button class="btn-action-sm" id="btn-generate-report" title="Generate compliance report">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                                Report
+                            </button>
+                            <button class="btn-action-sm" id="btn-export-compliance" title="Export audit logs to CSV">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <p class="section-subtitle">Regulatory compliance and audit management</p>
+                    <div class="metrics-grid" id="compliance-stats"></div>
+                    <div id="compliance-search-bar" class="search-filter-bar"></div>
+                    <div class="data-card">
+                        <div class="data-card-header"><h3>Audit Log</h3></div>
+                        <div id="compliance-body" class="data-card-body">
+                            <div class="loading-state">Loading audit data...</div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast container for notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Modal overlay container -->
+    <div id="modal-overlay" class="modal-overlay" hidden></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/app.js?v=6"></script>
+</body>
+</html>

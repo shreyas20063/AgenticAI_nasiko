@@ -1,0 +1,24 @@
+{
+  "full_name": "Alex Chen",
+  "email": "alex.chen@email.com",
+  "phone": "+1-555-0101",
+  "location": "San Francisco, CA",
+  "current_title": "Software Engineer",
+  "current_company": "TechStartup Inc.",
+  "years_experience": 6,
+  "resume_text": "Senior Software Engineer with 6 years of experience building scalable backend systems. Currently at TechStartup Inc. where I lead backend architecture for a real-time data processing platform handling 10M+ events/day. Proficient in Python, Go, PostgreSQL, Redis, and AWS. Previously at MidSize Corp building REST APIs and microservices. BS Computer Science from State University (2018). Certified AWS Solutions Architect. Led migration from monolith to microservices architecture, reducing deployment time by 80%. Mentored 3 junior engineers.",
+  "education": [
+    {"degree": "B.S. Computer Science", "institution": "State University", "year": "2018"}
+  ],
+  "skills": [
+    {"name": "Python", "proficiency": "expert", "years": 6},
+    {"name": "Go", "proficiency": "advanced", "years": 3},
+    {"name": "PostgreSQL", "proficiency": "advanced", "years": 5},
+    {"name": "AWS", "proficiency": "advanced", "years": 4},
+    {"name": "Kubernetes", "proficiency": "intermediate", "years": 2},
+    {"name": "REST APIs", "proficiency": "expert", "years": 6},
+    {"name": "Redis", "proficiency": "advanced", "years": 3},
+    {"name": "Docker", "proficiency": "advanced", "years": 4}
+  ],
+  "certifications": ["AWS Solutions Architect Associate"]
+}

@@ -1,0 +1,24 @@
+{
+  "title": "Senior Software Engineer",
+  "department": "Engineering",
+  "description": "We are looking for a Senior Software Engineer to join our growing engineering team. You will design and build scalable backend systems, mentor junior engineers, and contribute to our technical architecture. The ideal candidate has strong experience with Python, distributed systems, and cloud infrastructure.",
+  "location": "San Francisco, CA (Hybrid)",
+  "employment_type": "full_time",
+  "salary_min": 150000,
+  "salary_max": 200000,
+  "required_skills": [
+    {"skill": "Python", "min_years": 4},
+    {"skill": "SQL/Databases", "min_years": 3},
+    {"skill": "REST APIs", "min_years": 3},
+    {"skill": "Cloud (AWS/GCP/Azure)", "min_years": 2}
+  ],
+  "preferred_skills": [
+    {"skill": "Kubernetes", "min_years": 1},
+    {"skill": "Machine Learning", "min_years": 1},
+    {"skill": "System Design", "min_years": 2},
+    {"skill": "TypeScript", "min_years": 1}
+  ],
+  "min_experience_years": 5,
+  "education_requirement": "Bachelor's in Computer Science or related field",
+  "blind_screening": true
+}
