@@ -74,16 +74,16 @@ class Agent:
             send_decision,
             get_application_status,
         ]
-        if os.getenv("OPENAI_API_KEY"):
-            self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
-        else:
-            aipipe_token = os.getenv("AIPIPE_TOKEN")
+        aipipe_token = os.getenv("AIPIPE_TOKEN")
+        if aipipe_token:
             self.llm = ChatOpenAI(
                 model="gpt-4o",
                 temperature=0,
                 openai_api_key=aipipe_token,
                 openai_api_base="https://aipipe.org/openai/v1",
             )
+        else:
+            self.llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_PROMPT),

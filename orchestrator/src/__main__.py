@@ -270,17 +270,11 @@ async def handle_a2a(request: Request):
             user_id = msg_user_id
 
         if role.lower() not in VALID_ROLES:
-            logger.warning(f"[ORCHESTRATOR] Invalid role: '{role}'")
-            response = create_completed_task(
-                f"Unknown role '{role}'. Please specify your role:\n"
-                f"  Role: EMPLOYEE (your-id). your question\n"
-                f"  Role: APPLICANT (your-id). your question\n"
-                f"  Role: HR. your question\n"
-                f"  Role: MANAGER (your-id). your question\n"
-                f"  Role: CEO. your question",
-                request_id,
-            )
-            return JSONResponse(content=response.model_dump())
+            # No role prefix in message — treat as general HR inquiry (HR role, full access)
+            logger.info(f"[ORCHESTRATOR] No role prefix detected, defaulting to hr for: '{message_text[:80]}'")
+            role = "hr"
+            user_id = "unknown"
+            clean_message = message_text
 
         # ── Step 3: LLM intent classification ───────────────────
         agent_key, reasoning = await classify_intent(clean_message, role)

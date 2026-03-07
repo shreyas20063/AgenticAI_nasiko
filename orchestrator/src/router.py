@@ -34,7 +34,15 @@ _client = None
 def _get_openai_client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        aipipe_token = os.getenv("AIPIPE_TOKEN")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if aipipe_token:
+            _client = AsyncOpenAI(
+                api_key=aipipe_token,
+                base_url="https://aipipe.org/openai/v1",
+            )
+        else:
+            _client = AsyncOpenAI(api_key=openai_key)
     return _client
 
 
