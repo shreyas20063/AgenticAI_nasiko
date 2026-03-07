@@ -23,6 +23,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "hrflow-internal-secret-change-me")
+
 
 
 @asynccontextmanager
@@ -77,6 +79,15 @@ async def agent_card():
 
 @app.post("/")
 async def handle_a2a(request: Request):
+    # ── Internal token validation ────────────────────────────────
+    token = request.headers.get("X-Internal-Token", "")
+    if token != INTERNAL_SECRET:
+        logger.warning(f"[SECURITY] Rejected request with invalid internal token from {request.client.host if request.client else 'unknown'}")
+        return JSONResponse(
+            content={"jsonrpc": "2.0", "id": "unknown", "error": {"code": -32003, "message": "Unauthorized: invalid internal token"}},
+            status_code=403,
+        )
+
     body = None
     try:
         body = await request.json()

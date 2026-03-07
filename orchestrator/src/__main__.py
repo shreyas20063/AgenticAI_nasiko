@@ -1,7 +1,14 @@
 """HRFlow AI Orchestrator — Central routing hub for all HR agents.
 
 Serves on port 5000. Routes user requests to the correct sub-agent
-based on role + intent classification. Pure Python routing, NO LLM.
+using LLM-based intent classification.
+
+Security features:
+- Rate limiting (30 req/min per IP)
+- Prompt injection detection
+- Input sanitization (max 2000 chars)
+- Structured audit logging
+- Internal shared-secret header injected to sub-agents
 
 Exposes:
 - GET  /health                  -> health check
@@ -12,6 +19,8 @@ Exposes:
 import json
 import logging
 import os
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 import click
@@ -29,12 +38,16 @@ from router import (
     classify_intent,
     extract_role_from_message,
 )
+from security import audit, check_rate_limit, detect_prompt_injection, sanitize_input
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger("orchestrator")
+
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "hrflow-internal-secret-change-me")
+VALID_ROLES = {"employee", "applicant", "hr", "manager", "ceo"}
 
 
 @asynccontextmanager
@@ -43,36 +56,37 @@ async def lifespan(app: FastAPI):
     logger.info(f"  Recruitment Agent:       {recruitment_client.base_url}")
     logger.info(f"  Employee Services Agent: {employee_services_client.base_url}")
     logger.info(f"  Analytics Agent:         {analytics_client.base_url}")
+    logger.info(f"  Internal secret:         {'SET' if INTERNAL_SECRET != 'hrflow-internal-secret-change-me' else 'DEFAULT (change in prod!)'}")
     yield
 
 
 app = FastAPI(title="HRFlow AI Orchestrator", lifespan=lifespan)
 
-# ── A2A Clients (initialized at startup) ───────────────────────
+# ── A2A Clients ─────────────────────────────────────────────────
 
 recruitment_client = A2AClient(
     base_url=os.getenv("RECRUITMENT_AGENT_URL", "http://recruitment-agent:8001"),
     agent_name="Recruitment Agent",
+    internal_secret=INTERNAL_SECRET,
 )
-
 employee_services_client = A2AClient(
     base_url=os.getenv("EMPLOYEE_SERVICES_URL", "http://employee-services:8002"),
     agent_name="Employee Services Agent",
+    internal_secret=INTERNAL_SECRET,
 )
-
 analytics_client = A2AClient(
     base_url=os.getenv("ANALYTICS_AGENT_URL", "http://analytics-agent:8003"),
     agent_name="Analytics Agent",
+    internal_secret=INTERNAL_SECRET,
 )
 
-# Map agent keys to clients
 AGENT_CLIENTS = {
     RECRUITMENT: recruitment_client,
     EMPLOYEE_SERVICES: employee_services_client,
     ANALYTICS: analytics_client,
 }
 
-# ── AgentCard loader ────────────────────────────────────────────
+# ── AgentCard ────────────────────────────────────────────────────
 
 _agent_card = None
 
@@ -87,14 +101,11 @@ def get_agent_card():
             with open(card_path) as f:
                 _agent_card = json.load(f)
         else:
-            _agent_card = {
-                "name": "HRFlow AI Orchestrator",
-                "status": "active",
-            }
+            _agent_card = {"name": "HRFlow AI Orchestrator", "status": "active"}
     return _agent_card
 
 
-# ── Endpoints ───────────────────────────────────────────────────
+# ── Endpoints ────────────────────────────────────────────────────
 
 
 @app.get("/health")
@@ -107,65 +118,98 @@ async def agent_card():
     return get_agent_card()
 
 
-VALID_ROLES = {"employee", "applicant", "hr", "manager", "ceo"}
-
-
 @app.post("/")
 async def handle_a2a(request: Request):
-    """Handle incoming A2A JSON-RPC requests and route to sub-agents."""
+    """Handle incoming A2A JSON-RPC requests with full security pipeline."""
+    start_time = time.time()
+    request_id = "unknown"
+    role = "unknown"
+    user_id = "unknown"
+    agent_routed = "none"
     body = None
+    ip = request.client.host if request.client else "unknown"
+
     try:
+        # ── Security: Rate limiting ──────────────────────────────
+        allowed, remaining = check_rate_limit(ip)
+        if not allowed:
+            logger.warning(f"[SECURITY] Rate limit hit for IP {ip}")
+            return JSONResponse(
+                content={
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32029,
+                        "message": "Rate limit exceeded. Please wait before sending more requests.",
+                    },
+                },
+                status_code=429,
+                headers={"Retry-After": "60"},
+            )
+
+        # ── Parse request ────────────────────────────────────────
         body = await request.json()
         rpc_request = JsonRpcRequest(**body)
         request_id = rpc_request.id
 
-        # Guard: Unknown JSON-RPC method
         if rpc_request.method != "message/send":
-            logger.warning(
-                f"[ORCHESTRATOR] Unknown method: {rpc_request.method}"
-            )
-            return JSONResponse(content={
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "error": {
-                    "code": -32601,
-                    "message": f"Method not found: '{rpc_request.method}'. "
-                               f"Only 'message/send' is supported.",
+            return JSONResponse(
+                content={
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32601,
+                        "message": f"Method not found: '{rpc_request.method}'. Only 'message/send' is supported.",
+                    },
                 },
-            }, status_code=400)
+                status_code=400,
+            )
 
-        # Extract text from message parts
         text_parts = [
             part.text
             for part in rpc_request.params.message.parts
             if part.kind == "text" and part.text
         ]
-        message_text = " ".join(text_parts).strip()
+        raw_text = " ".join(text_parts).strip()
 
-        # Guard: Empty message
-        if not message_text:
-            logger.warning("[ORCHESTRATOR] Empty message received")
+        if not raw_text:
             response = create_completed_task(
-                "I didn't receive a message. How can I help you today?\n\n"
-                "Please start your message with your role, for example:\n"
+                "I didn't receive a message. Please start with your role:\n"
                 "  Role: EMPLOYEE (EMP-001). What is the remote work policy?",
                 request_id,
             )
             return JSONResponse(content=response.model_dump())
 
-        logger.info(f"[ORCHESTRATOR] Received: \"{message_text[:150]}\"")
+        # ── Security: Sanitize input ─────────────────────────────
+        message_text, truncation_note = sanitize_input(raw_text)
+        if truncation_note:
+            logger.info(f"[SECURITY] {truncation_note}")
 
-        # Step 1: Extract role from message
-        role, user_id, clean_message = extract_role_from_message(message_text)
-
-        # Guard: Invalid or missing role
-        if role.lower() not in VALID_ROLES:
-            logger.warning(
-                f"[ORCHESTRATOR] Invalid role: '{role}'"
+        # ── Security: Prompt injection detection ─────────────────
+        if detect_prompt_injection(message_text):
+            latency = (time.time() - start_time) * 1000
+            audit(
+                request_id=request_id, ip=ip, role=role, user_id=user_id,
+                agent_routed_to=agent_routed, message_preview=message_text,
+                latency_ms=latency, status="blocked",
+                blocked_reason="prompt_injection",
             )
             response = create_completed_task(
-                f"Unknown role '{role}'. Please specify your role by starting "
-                f"your message with one of:\n"
+                "Your request was flagged as potentially unsafe and cannot be processed. "
+                "Please rephrase your question.",
+                request_id,
+            )
+            return JSONResponse(content=response.model_dump())
+
+        logger.info(f"[ORCHESTRATOR] [{ip}] Received: \"{message_text[:150]}\"")
+
+        # ── Step 1: Extract role ─────────────────────────────────
+        role, user_id, clean_message = extract_role_from_message(message_text)
+
+        if role.lower() not in VALID_ROLES:
+            logger.warning(f"[ORCHESTRATOR] Invalid role: '{role}'")
+            response = create_completed_task(
+                f"Unknown role '{role}'. Please specify your role:\n"
                 f"  Role: EMPLOYEE (your-id). your question\n"
                 f"  Role: APPLICANT (your-id). your question\n"
                 f"  Role: HR. your question\n"
@@ -175,54 +219,54 @@ async def handle_a2a(request: Request):
             )
             return JSONResponse(content=response.model_dump())
 
-        # Step 2: Classify intent and pick target agent (LLM-based)
+        # ── Step 2: LLM intent classification ───────────────────
         agent_key, reasoning = await classify_intent(clean_message, role)
+        agent_routed = agent_key
+        logger.info(f"[ROUTER] Role={role} | Agent={agent_key} | Reason={reasoning}")
 
-        logger.info(
-            f"[ROUTER] Role={role} | Agent={agent_key} | Reason={reasoning}"
-        )
+        # ── Step 3: Build contextualized message ─────────────────
+        contextualized = build_contextualized_message(clean_message, role, user_id)
 
-        # Step 3: Build contextualized message for sub-agent
-        contextualized = build_contextualized_message(
-            clean_message, role, user_id
-        )
-
-        # Step 4: Forward to sub-agent via A2A
+        # ── Step 4: Forward to sub-agent ─────────────────────────
         client = AGENT_CLIENTS[agent_key]
         result = await client.send_message(contextualized)
 
-        # Step 5: Return response
+        # ── Step 5: Return response ──────────────────────────────
+        latency = (time.time() - start_time) * 1000
+        final_text = result.get("text", "")
+        if not final_text and result["status"] != "completed":
+            final_text = (
+                f"I'm sorry, the {client.agent_name} is temporarily unavailable. "
+                "Please try again shortly."
+            )
+
+        audit(
+            request_id=request_id, ip=ip, role=role, user_id=user_id,
+            agent_routed_to=agent_routed, message_preview=clean_message,
+            latency_ms=latency, status=result["status"],
+        )
+
         if result["status"] == "completed":
-            logger.info(
-                f"[ORCHESTRATOR] \u2713 Response from {client.agent_name} "
-                f"({len(result['text'])} chars)"
-            )
-            response = create_completed_task(result["text"], request_id)
-            return JSONResponse(content=response.model_dump())
+            logger.info(f"[ORCHESTRATOR] ✓ {client.agent_name} | {latency:.0f}ms | {len(final_text)} chars")
         else:
-            # Return graceful message as "completed" so user sees text, not error
-            logger.warning(
-                f"[ORCHESTRATOR] \u2717 {client.agent_name} returned "
-                f"status={result['status']}"
-            )
-            graceful_msg = (
-                f"I'm sorry, the {client.agent_name} is temporarily "
-                f"unavailable. Your request has been noted. "
-                f"Please try again shortly."
-            )
-            if result.get("text"):
-                graceful_msg = result["text"]
-            response = create_completed_task(graceful_msg, request_id)
-            return JSONResponse(content=response.model_dump())
+            logger.warning(f"[ORCHESTRATOR] ✗ {client.agent_name} status={result['status']}")
+
+        response = create_completed_task(final_text, request_id)
+        return JSONResponse(content=response.model_dump())
 
     except Exception as e:
         logger.error(f"[ORCHESTRATOR] Error: {str(e)}", exc_info=True)
-        request_id = "unknown"
         if body:
             try:
-                request_id = body.get("id", "unknown")
+                request_id = body.get("id", request_id)
             except Exception:
                 pass
+        latency = (time.time() - start_time) * 1000
+        audit(
+            request_id=request_id, ip=ip, role=role, user_id=user_id,
+            agent_routed_to=agent_routed, message_preview="",
+            latency_ms=latency, status="error", blocked_reason=str(e)[:80],
+        )
         error_response = create_completed_task(
             "I encountered an unexpected error processing your request. "
             "Please try again or contact support.",
@@ -231,7 +275,7 @@ async def handle_a2a(request: Request):
         return JSONResponse(content=error_response.model_dump())
 
 
-# ── CLI entry point ─────────────────────────────────────────────
+# ── CLI ──────────────────────────────────────────────────────────
 
 
 @click.command()
