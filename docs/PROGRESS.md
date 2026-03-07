@@ -15,10 +15,10 @@
 - [x] `docker network create agents-net` documented in README
 
 ## Phase 1: Shared Foundation
-- [ ] shared/mock_data.py — all mock data (employees, candidates, policies, metrics)
-- [ ] shared/a2a_models.py — Pydantic models for A2A protocol
-- [ ] Mock data tested: can import and access all data structures
-- [ ] Git commit: "feat: add shared mock data and A2A models"
+- [x] shared/mock_data.py — all mock data (employees, candidates, policies, metrics)
+- [x] shared/a2a_models.py — Pydantic models for A2A protocol
+- [x] Mock data tested: can import and access all data structures
+- [x] Git commit: "feat: add shared mock data and A2A models"
 
 ## Phase 2: Employee Services Agent (Port 8002)
 - [ ] src/__main__.py — FastAPI app with A2A JSON-RPC handler + /health + /.well-known/agent.json
@@ -95,6 +95,6 @@
 
 ---
 
-## Current Phase: Phase 0 COMPLETE — Ready for Phase 1
+## Current Phase: Phase 1 COMPLETE — Ready for Phase 2
 ## Blocker: None
-## Notes: Phase 0 scaffolding complete. All directories, Dockerfiles, docker-compose files, AgentCards, and placeholder files created.
+## Notes: Phase 1 shared foundation complete. 12 employees, 8 candidates, 4 job openings, 10 policies, 5 leave requests, 4 tickets, calendar slots, company metrics, payslips. A2A models with 10 Pydantic v2 classes + helpers.

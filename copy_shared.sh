@@ -1,14 +1,11 @@
 #!/bin/bash
-# copy_shared.sh — Run before every docker build
-# Copies shared files into each service's src/ directory
+# copy_shared.sh — copies shared files into each agent's src/ before docker build
+set -e
 
-cp shared/mock_data.py orchestrator/src/mock_data.py
-cp shared/a2a_models.py orchestrator/src/a2a_models.py
-cp shared/mock_data.py recruitment-agent/src/mock_data.py
-cp shared/a2a_models.py recruitment-agent/src/a2a_models.py
-cp shared/mock_data.py employee-services/src/mock_data.py
-cp shared/a2a_models.py employee-services/src/a2a_models.py
-cp shared/mock_data.py analytics-agent/src/mock_data.py
-cp shared/a2a_models.py analytics-agent/src/a2a_models.py
+for dir in orchestrator recruitment-agent employee-services analytics-agent; do
+    cp shared/mock_data.py "$dir/src/mock_data.py"
+    cp shared/a2a_models.py "$dir/src/a2a_models.py"
+    echo "Copied shared files to $dir/src/"
+done
 
-echo "Shared files copied to all services."
+echo "All shared files copied. Ready for docker compose build."
