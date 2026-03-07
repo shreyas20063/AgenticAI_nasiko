@@ -110,6 +110,9 @@ async def agent_card():
     return get_agent_card()
 
 
+VALID_ROLES = {"employee", "applicant", "hr", "manager", "ceo"}
+
+
 @app.post("/")
 async def handle_a2a(request: Request):
     """Handle incoming A2A JSON-RPC requests and route to sub-agents."""
@@ -117,6 +120,22 @@ async def handle_a2a(request: Request):
     try:
         body = await request.json()
         rpc_request = JsonRpcRequest(**body)
+        request_id = rpc_request.id
+
+        # Guard: Unknown JSON-RPC method
+        if rpc_request.method != "message/send":
+            logger.warning(
+                f"[ORCHESTRATOR] Unknown method: {rpc_request.method}"
+            )
+            return JSONResponse(content={
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32601,
+                    "message": f"Method not found: '{rpc_request.method}'. "
+                               f"Only 'message/send' is supported.",
+                },
+            }, status_code=400)
 
         # Extract text from message parts
         text_parts = [
@@ -124,12 +143,40 @@ async def handle_a2a(request: Request):
             for part in rpc_request.params.message.parts
             if part.kind == "text" and part.text
         ]
-        message_text = " ".join(text_parts)
+        message_text = " ".join(text_parts).strip()
+
+        # Guard: Empty message
+        if not message_text:
+            logger.warning("[ORCHESTRATOR] Empty message received")
+            response = create_completed_task(
+                "I didn't receive a message. How can I help you today?\n\n"
+                "Please start your message with your role, for example:\n"
+                "  Role: EMPLOYEE (EMP-001). What is the remote work policy?",
+                request_id,
+            )
+            return JSONResponse(content=response.model_dump())
 
         logger.info(f"[ORCHESTRATOR] Received: \"{message_text[:150]}\"")
 
         # Step 1: Extract role from message
         role, user_id, clean_message = extract_role_from_message(message_text)
+
+        # Guard: Invalid or missing role
+        if role.lower() not in VALID_ROLES:
+            logger.warning(
+                f"[ORCHESTRATOR] Invalid role: '{role}'"
+            )
+            response = create_completed_task(
+                f"Unknown role '{role}'. Please specify your role by starting "
+                f"your message with one of:\n"
+                f"  Role: EMPLOYEE (your-id). your question\n"
+                f"  Role: APPLICANT (your-id). your question\n"
+                f"  Role: HR. your question\n"
+                f"  Role: MANAGER (your-id). your question\n"
+                f"  Role: CEO. your question",
+                request_id,
+            )
+            return JSONResponse(content=response.model_dump())
 
         # Step 2: Classify intent and pick target agent
         agent_key, reasoning = classify_intent(clean_message, role)
@@ -153,17 +200,23 @@ async def handle_a2a(request: Request):
                 f"[ORCHESTRATOR] \u2713 Response from {client.agent_name} "
                 f"({len(result['text'])} chars)"
             )
-            response = create_completed_task(result["text"], rpc_request.id)
+            response = create_completed_task(result["text"], request_id)
             return JSONResponse(content=response.model_dump())
         else:
+            # Return graceful message as "completed" so user sees text, not error
             logger.warning(
                 f"[ORCHESTRATOR] \u2717 {client.agent_name} returned "
                 f"status={result['status']}"
             )
-            response = create_failed_task(result["text"], rpc_request.id)
-            return JSONResponse(
-                content=response.model_dump(), status_code=502
+            graceful_msg = (
+                f"I'm sorry, the {client.agent_name} is temporarily "
+                f"unavailable. Your request has been noted. "
+                f"Please try again shortly."
             )
+            if result.get("text"):
+                graceful_msg = result["text"]
+            response = create_completed_task(graceful_msg, request_id)
+            return JSONResponse(content=response.model_dump())
 
     except Exception as e:
         logger.error(f"[ORCHESTRATOR] Error: {str(e)}", exc_info=True)
@@ -173,12 +226,12 @@ async def handle_a2a(request: Request):
                 request_id = body.get("id", "unknown")
             except Exception:
                 pass
-        error_response = create_failed_task(
-            f"Orchestrator error: {str(e)}", request_id
+        error_response = create_completed_task(
+            "I encountered an unexpected error processing your request. "
+            "Please try again or contact support.",
+            request_id,
         )
-        return JSONResponse(
-            content=error_response.model_dump(), status_code=500
-        )
+        return JSONResponse(content=error_response.model_dump())
 
 
 # ── CLI entry point ─────────────────────────────────────────────

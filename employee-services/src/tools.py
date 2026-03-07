@@ -4,11 +4,28 @@ All tools return str and never raise exceptions.
 Mock data is imported from mock_data.py (copied into src/ at build time).
 """
 
+import re
 from datetime import date
+from typing import Tuple
 
 from langchain_core.tools import tool
 
 from mock_data import EMPLOYEES, LEAVE_REQUESTS, PAYSLIPS, POLICIES, TICKETS
+
+
+# ── Role extraction helper ──────────────────────────────────────
+
+_ROLE_RE = re.compile(
+    r"Role:\s*(\w+)\s*(?:\(([^)]+)\))?", re.IGNORECASE
+)
+
+
+def _parse_role(text: str) -> Tuple[str, str]:
+    """Extract (role, user_id) from message text. Returns ('unknown','unknown') if not found."""
+    m = _ROLE_RE.search(text)
+    if m:
+        return m.group(1).upper(), (m.group(2) or "unknown").strip()
+    return "UNKNOWN", "unknown"
 
 
 @tool

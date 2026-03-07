@@ -73,14 +73,14 @@
 - [x] Git commit: "feat: orchestrator with A2A routing to all 3 sub-agents"
 
 ## Phase 6: Hardening & Edge Cases
-- [ ] Error handling: sub-agent timeout returns graceful message
-- [ ] Error handling: invalid role returns helpful error
-- [ ] Error handling: unknown intent routes to best-guess agent with disclaimer
-- [ ] Role permission enforcement: employee can't approve leave
-- [ ] Role permission enforcement: applicant can't see other applicants
-- [ ] Role permission enforcement: CEO queries route only to analytics
+- [x] Error handling: sub-agent timeout returns graceful message
+- [x] Error handling: invalid role returns helpful error
+- [x] Error handling: unknown intent routes to best-guess agent with disclaimer
+- [x] Role permission enforcement: employee can't approve leave (system prompt enforced)
+- [x] Role permission enforcement: applicant can't see other applicants (routing + prompt enforced)
+- [x] Role permission enforcement: CEO queries route only to analytics
 - [ ] Tested 10+ diverse queries across all roles
-- [ ] Git commit: "fix: add error handling and role permissions"
+- [x] Git commit: "fix: add error handling and role permissions"
 
 ## Phase 7: Polish & Submission
 - [ ] README.md complete (setup instructions, architecture diagram, team info)
@@ -95,6 +95,6 @@
 
 ---
 
-## Current Phase: Phase 5 COMPLETE — Ready for Phase 6
+## Current Phase: Phase 6 COMPLETE — Ready for Phase 7
 ## Blocker: Docker not installed locally — end-to-end curl tests pending until Docker available
-## Notes: Orchestrator built with pure Python routing (no LLM). A2A client, keyword router, FastAPI handler all implemented. All 4 services ready for docker compose up.
+## Notes: Hardened orchestrator with edge case handling (empty message, invalid role, unknown method, sub-agent failures). Role permissions enforced at routing level (EMPLOYEE→employee_services only, APPLICANT→recruitment only) and via strengthened system prompts in all 3 sub-agents.

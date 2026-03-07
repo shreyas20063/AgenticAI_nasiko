@@ -80,7 +80,7 @@ def extract_role_from_message(text: str) -> Tuple[str, str, str]:
 
     Returns:
         (role, user_id, clean_message)
-        Defaults to ("employee", "unknown", original_text) if no prefix found.
+        Defaults to ("none", "unknown", original_text) if no prefix found.
     """
     match = _ROLE_PATTERN.match(text.strip())
     if match:
@@ -90,8 +90,8 @@ def extract_role_from_message(text: str) -> Tuple[str, str, str]:
         logger.info(f"[ROUTER] Extracted role={role}, user_id={user_id}")
         return role, user_id, clean_message
 
-    logger.info("[ROUTER] No role prefix found, defaulting to EMPLOYEE")
-    return "employee", "unknown", text.strip()
+    logger.info("[ROUTER] No role prefix found, returning 'none'")
+    return "none", "unknown", text.strip()
 
 
 def classify_intent(user_message: str, role: str) -> Tuple[str, str]:
@@ -107,33 +107,68 @@ def classify_intent(user_message: str, role: str) -> Tuple[str, str]:
         (agent_key, reasoning) — e.g., ("analytics", "role_default:ceo")
     """
     msg_lower = user_message.lower()
+    role_lower = role.lower()
+
+    # Role-based access restrictions (enforced at routing level)
+    # EMPLOYEE: only employee_services
+    # APPLICANT: only recruitment
+    # CEO: only analytics (with keyword override to recruitment)
+    ROLE_RESTRICTIONS = {
+        "employee": {EMPLOYEE_SERVICES},
+        "applicant": {RECRUITMENT},
+    }
+
+    allowed_agents = ROLE_RESTRICTIONS.get(role_lower)
 
     # Step 1: Role-based defaults with keyword override
-    if role.lower() in ROLE_DEFAULTS:
-        default = ROLE_DEFAULTS[role.lower()]
+    if role_lower in ROLE_DEFAULTS:
+        default = ROLE_DEFAULTS[role_lower]
         # Still check keywords — CEO might ask about hiring specifically
         for keywords, agent in KEYWORD_RULES:
             matched = [kw for kw in keywords if kw in msg_lower]
             if matched:
+                # Enforce restrictions: if agent not allowed, use default
+                if allowed_agents and agent not in allowed_agents:
+                    logger.info(
+                        f"[ROUTER] Role={role} | Keyword '{matched[0]}' "
+                        f"matched {agent} but restricted \u2192 {default}"
+                    )
+                    return default, f"role_restricted:{role_lower}"
                 logger.info(
                     f"[ROUTER] Role={role} | Keyword override: "
                     f"'{matched[0]}' \u2192 {agent}"
                 )
                 return agent, f"keyword_match:{matched[0]}"
         logger.info(f"[ROUTER] Role={role} | Using role default \u2192 {default}")
-        return default, f"role_default:{role.lower()}"
+        return default, f"role_default:{role_lower}"
 
     # Step 2: Keyword matching for all other roles
     for keywords, agent in KEYWORD_RULES:
         matched = [kw for kw in keywords if kw in msg_lower]
         if matched:
+            # Enforce restrictions
+            if allowed_agents and agent not in allowed_agents:
+                fallback = next(iter(allowed_agents))
+                logger.info(
+                    f"[ROUTER] Role={role} | Keyword '{matched[0]}' "
+                    f"matched {agent} but restricted \u2192 {fallback}"
+                )
+                return fallback, f"role_restricted:{role_lower}"
             logger.info(
                 f"[ROUTER] Role={role} | Keyword match: "
                 f"'{matched[0]}' \u2192 {agent}"
             )
             return agent, f"keyword_match:{matched[0]}"
 
-    # Step 3: Fallback — employee services has broadest coverage
+    # Step 3: Fallback — use restriction default or employee_services
+    if allowed_agents:
+        fallback = next(iter(allowed_agents))
+        logger.info(
+            f"[ROUTER] Role={role} | No keyword match, "
+            f"restricted fallback \u2192 {fallback}"
+        )
+        return fallback, f"role_restricted_fallback:{role_lower}"
+
     logger.info(
         f"[ROUTER] Role={role} | No keyword match, "
         f"falling back to {EMPLOYEE_SERVICES}"
