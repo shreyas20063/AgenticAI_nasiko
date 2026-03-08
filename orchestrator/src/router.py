@@ -23,10 +23,21 @@ ROLE_RESTRICTIONS = {
     "applicant": {RECRUITMENT},
 }
 
-_ROLE_PATTERN = re.compile(
-    r"^Role:\s*(\w+)(?:\s*\(([^)]+)\))?\s*\.?\s*(?:Request:\s*)?(.*)",
-    re.IGNORECASE | re.DOTALL,
-)
+# Role keywords — multi-word entries checked first for specificity
+_ROLE_KEYWORDS = [
+    ("hr admin", "hr"),
+    ("human resources", "hr"),
+    ("ceo", "ceo"),
+    ("manager", "manager"),
+    ("applicant", "applicant"),
+    ("candidate", "applicant"),
+    ("employee", "employee"),
+    ("hr", "hr"),
+    ("admin", "hr"),
+]
+
+# Matches IDs like EMP-001, CAND-003, MGR-002
+_ID_PATTERN = re.compile(r"\b((?:EMP|CAND|MGR|HR|CEO)-\d+)\b", re.IGNORECASE)
 
 _client = None
 
@@ -47,16 +58,41 @@ def _get_openai_client() -> AsyncOpenAI:
 
 
 def extract_role_from_message(text: str) -> Tuple[str, str, str]:
-    """Extract role, user ID, and clean message from prefixed text."""
-    match = _ROLE_PATTERN.match(text.strip())
-    if match:
-        role = match.group(1).strip()
-        user_id = match.group(2).strip() if match.group(2) else "unknown"
-        clean_message = match.group(3).strip()
-        logger.info(f"[ROUTER] Extracted role={role}, user_id={user_id}")
-        return role, user_id, clean_message
-    logger.info("[ROUTER] No role prefix found, returning 'none'")
-    return "none", "unknown", text.strip()
+    """Extract role, user ID, and clean question from any message format.
+
+    Handles both:
+      - Platform format:  'Role: Employee | EMP-001\\n"question"'
+      - Natural format:   'employee EMP-001 how many leaves left?'
+    Strips role/ID tokens from the returned question so the LLM
+    classifier only sees the actual intent.
+    """
+    text_stripped = text.strip()
+    text_lower = text_stripped.lower()
+
+    # Detect role using word boundaries (prevents "candidates" matching "candidate")
+    role = "none"
+    matched_keyword = None
+    for keyword, normalized in _ROLE_KEYWORDS:
+        if re.search(r"\b" + re.escape(keyword) + r"\b", text_lower):
+            role = normalized
+            matched_keyword = keyword
+            break
+
+    # Detect ID anywhere in the message
+    id_match = _ID_PATTERN.search(text_stripped)
+    user_id = id_match.group(1).upper() if id_match else "unknown"
+
+    # Strip role keyword, ID, and "Role:" prefix to get a clean question
+    clean = text_stripped
+    if matched_keyword:
+        clean = re.sub(r"\b" + re.escape(matched_keyword) + r"\b", "", clean, flags=re.IGNORECASE)
+    if id_match:
+        clean = clean.replace(id_match.group(0), "")
+    clean = re.sub(r"(?i)^role\s*:", "", clean)
+    clean = re.sub(r'^[\s|:.\-"\']+', "", clean).strip()
+
+    logger.info(f"[ROUTER] role={role}, user_id={user_id}, question='{clean[:80]}'")
+    return role, user_id, clean or text_stripped
 
 
 async def classify_intent(user_message: str, role: str) -> Tuple[str, str]:

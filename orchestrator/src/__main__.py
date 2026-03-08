@@ -50,6 +50,77 @@ from session import (
     verify_session_token,
 )
 
+try:
+    from mock_data import CANDIDATES, EMPLOYEES
+    _MOCK_DATA_AVAILABLE = True
+except ImportError:
+    EMPLOYEES = {}
+    CANDIDATES = {}
+    _MOCK_DATA_AVAILABLE = False
+
+
+def _validate_role_identity(role: str, user_id: str) -> tuple:
+    """Check that the claimed role matches the employee's actual record.
+
+    Format checks run always. Department/title checks run when mock data is loaded.
+    Returns (is_valid, error_message).
+    """
+    if user_id == "unknown":
+        return True, ""
+
+    role_lower = role.lower()
+    uid = user_id.upper()
+
+    # Applicants must use CAND-XXX
+    if role_lower == "applicant":
+        if not uid.startswith("CAND-"):
+            return False, (
+                f"Access denied. '{user_id}' is not a valid applicant ID. "
+                "Applicants must use a CAND-XXX ID."
+            )
+        return True, ""
+
+    # All other roles must use EMP-XXX (not CAND-)
+    if uid.startswith("CAND-"):
+        return False, (
+            f"Access denied. '{user_id}' is a candidate ID and cannot be "
+            f"used with the {role} role."
+        )
+    if not uid.startswith("EMP-"):
+        return False, f"Access denied. '{user_id}' is not a valid employee ID."
+
+    # Deep check against employee records
+    if not _MOCK_DATA_AVAILABLE:
+        return True, ""
+
+    emp = EMPLOYEES.get(uid)
+    if emp is None:
+        return False, f"Access denied. Employee ID {user_id} not found in the system."
+
+    if role_lower == "hr":
+        if emp.get("department") != "HR":
+            return False, (
+                f"Access denied. {uid} ({emp['name']}) is in the "
+                f"{emp['department']} department and does not have HR privileges. "
+                "HR access requires an HR department ID (e.g. EMP-009)."
+            )
+    elif role_lower == "manager":
+        mgr_titles = ["manager", "director", "vp", "head", "chief"]
+        if not any(t in emp.get("role", "").lower() for t in mgr_titles):
+            return False, (
+                f"Access denied. {uid} ({emp['name']}) has the title "
+                f"'{emp['role']}' and does not have manager-level access."
+            )
+    elif role_lower == "ceo":
+        ceo_titles = ["vp", "vice president", "ceo", "chief", "president"]
+        if not any(t in emp.get("role", "").lower() for t in ceo_titles):
+            return False, (
+                f"Access denied. {uid} ({emp['name']}) does not have CEO-level access."
+            )
+
+    return True, ""
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -310,6 +381,19 @@ async def handle_a2a(request: Request):
             role = "hr"
             user_id = "unknown"
             clean_message = message_text
+
+        # ── Step 2.5: Validate role matches the claimed user ID ─
+        is_valid, validation_error = _validate_role_identity(role, user_id)
+        if not is_valid:
+            logger.warning(f"[SECURITY] Role-identity mismatch: role={role} user_id={user_id} from {ip}")
+            audit(
+                request_id=request_id, ip=ip, role=role, user_id=user_id,
+                agent_routed_to="none", message_preview=clean_message,
+                latency_ms=(time.time() - start_time) * 1000,
+                status="blocked", blocked_reason="role_identity_mismatch",
+            )
+            response = create_completed_task(validation_error, request_id)
+            return JSONResponse(content=response.model_dump())
 
         # ── Step 3: LLM intent classification ───────────────────
         agent_key, reasoning = await classify_intent(clean_message, role)
