@@ -347,14 +347,6 @@ AgenticAI_nasiko/
 ├── .env                        # OPENAI_API_KEY (gitignored)
 ├── demo_prompts.txt            # All 15 tool demos + security demos
 │
-├── docs/
-│   ├── FINAL_ARCHITECTURE.md
-│   ├── pitfalls_guide.md
-│   ├── agentic_ai_guide.md
-│   ├── PROGRESS.md
-│   ├── BUGS.md
-│   └── MISTAKES.md
-│
 ├── shared/                     # Copied into each agent before build
 │   ├── mock_data.py            # 12 employees, 8 candidates, policies
 │   └── a2a_models.py           # Pydantic v2 A2A protocol models
