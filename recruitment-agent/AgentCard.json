@@ -1,0 +1,38 @@
+{
+  "name": "HRFlow Recruitment Agent",
+  "description": "Handles all recruitment and hiring workflows: resume screening, candidate ranking, interview scheduling, and decision communication.",
+  "url": "http://localhost:8001",
+  "protocolVersion": "0.2.9",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "screen-resume",
+      "name": "Screen Resume",
+      "description": "Rate a candidate resume 1-100 against job requirements."
+    },
+    {
+      "id": "rank-candidates",
+      "name": "Rank Candidates",
+      "description": "Get sorted list of candidates by match score for a job role."
+    },
+    {
+      "id": "schedule-interview",
+      "name": "Schedule Interview",
+      "description": "Book an interview slot between a candidate and interviewer."
+    },
+    {
+      "id": "send-decision",
+      "name": "Send Decision",
+      "description": "Send offer or rejection notification to a candidate."
+    },
+    {
+      "id": "get-application-status",
+      "name": "Get Application Status",
+      "description": "Check current status of a job application."
+    }
+  ]
+}

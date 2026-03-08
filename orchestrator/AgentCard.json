@@ -1,0 +1,18 @@
+{
+  "name": "HRFlow AI — HR Automation Orchestrator",
+  "description": "Central orchestrator that routes HR requests to specialized domain agents based on user role and intent. Supports 5 roles: Employee, Applicant, HR Admin, Manager, CEO.",
+  "url": "http://localhost:5000",
+  "protocolVersion": "0.2.9",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "route-hr-request",
+      "name": "Route HR Request",
+      "description": "Routes user requests to the appropriate domain agent (Recruitment, Employee Services, or Analytics) based on role and intent."
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+services:
+  analytics-agent:
+    build: .
+    container_name: analytics-agent
+    command: ["python", "__main__.py", "--host", "0.0.0.0", "--port", "5000"]
+    ports:
+      - "5000:5000"
+    env_file: ../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - agents-net
+
+networks:
+  agents-net:
+    external: true

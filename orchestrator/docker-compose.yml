@@ -1,0 +1,13 @@
+services:
+  hr-orchestrator:
+    build: .
+    container_name: hr-orchestrator
+    ports:
+      - "5000:5000"
+    env_file: ../.env
+    networks:
+      - agents-net
+
+networks:
+  agents-net:
+    external: true

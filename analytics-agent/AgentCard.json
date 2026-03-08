@@ -1,0 +1,33 @@
+{
+  "name": "HRFlow Analytics & Insights Agent",
+  "description": "Provides company-wide HR analytics: headcount, attrition, hiring pipeline, and department statistics for data-driven decisions.",
+  "url": "http://localhost:8003",
+  "protocolVersion": "0.2.9",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "get-headcount",
+      "name": "Get Headcount",
+      "description": "Get current headcount breakdown by department."
+    },
+    {
+      "id": "get-attrition-report",
+      "name": "Get Attrition Report",
+      "description": "Get employee turnover report with department breakdown."
+    },
+    {
+      "id": "get-hiring-pipeline",
+      "name": "Get Hiring Pipeline",
+      "description": "Get recruitment pipeline status with time-to-hire metrics."
+    },
+    {
+      "id": "get-department-stats",
+      "name": "Get Department Stats",
+      "description": "Get detailed statistics for a specific department."
+    }
+  ]
+}
